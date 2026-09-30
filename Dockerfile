@@ -9,7 +9,7 @@ COPY package*.json ./
 # Install dependencies
 # Using npm install instead of ci to ensure it picks up the fixed dotenv version
 # and handles any potential lockfile mismatches gracefully
-RUN npm install
+RUN apk add --no-cache ffmpeg\n\nRUN npm install
 
 # Copy source code
 COPY . .
