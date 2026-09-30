@@ -492,9 +492,27 @@ async function searchYouTubeTrailer(contentName, type, season, language = 'en-US
  * Note: Recaps are now handled by recapProvider.js
  */
 async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, language = 'it-IT', useExternalLink = false) {
+    // Personal Simple MAX mode: when TMDB is unavailable, search YouTube directly.
+    // Stremio gives us an IMDb id; using it in the query avoids needing a metadata API.
     if (!getTmdbKey()) {
-        console.warn('[TrailerProvider] getTmdbKey() not set, skipping trailer fetch');
-        return [];
+        const searchName = contentName || imdbId || (tmdbId ? `TMDB ${tmdbId}` : '');
+        if (!searchName) return [];
+
+        const t = getTranslation(language);
+        let query = type === 'series' && season
+            ? `${searchName} ${t.season} ${season} ${t.trailer}`
+            : `${searchName} ${t.trailer}`;
+        if (language === 'it-IT') query += ' italiano ufficiale';
+
+        console.log(`[TrailerProvider] YouTube-only search: ${query}`);
+        const result = await searchYouTubeScraping(query);
+        if (!result?.ytId) return [];
+
+        const streamName = result.title || 'Trailer YouTube';
+        const stream = { name: `${streamName} · MAX`, title: streamName };
+        if (useExternalLink) stream.externalUrl = `https://www.youtube.com/watch?v=${result.ytId}`;
+        else stream.ytId = result.ytId;
+        return [stream];
     }
 
     const t = getTranslation(language);
