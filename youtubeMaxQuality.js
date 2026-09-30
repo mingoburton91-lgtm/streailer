@@ -1,40 +1,33 @@
-/**
- * Resolve the best YouTube playback sources.
- * Prefer a single progressive A/V stream when it already reaches the maximum
- * resolution. Otherwise expose the best separate video + audio tracks so the
- * addon can remux them without re-encoding.
- */
-let innertubePromise;
-async function getInnertube() {
-  if (!innertubePromise) innertubePromise = import('youtubei.js').then(({ Innertube }) => Innertube.create({ player_id: process.env.YOUTUBE_PLAYER_ID || '0004de42' }));
-  return innertubePromise;
-}
-function height(f) { return Number(f.height || (f.quality_label || '').match(/(\d+)p/)?.[1] || 0); }
-function bitrate(f) { return Number(f.bitrate || f.average_bitrate || 0); }
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
+
+function height(f) { return Number(f.height || 0); }
+function bitrate(f) { return Number(f.tbr || f.vbr || f.abr || 0); }
+
 async function resolveBestYouTubeSources(videoId) {
   try {
-    const yt = await getInnertube();
-    const info = await yt.getBasicInfo(videoId);
-    const sd = info.streaming_data || {};
-    const progressive = (sd.formats || []).filter(f => f.url).sort((a,b)=>height(b)-height(a)||bitrate(b)-bitrate(a));
-    const adaptive = (sd.adaptive_formats || []).filter(f => f.url);
-    const videos = adaptive.filter(f => height(f)>0 && String(f.mime_type||'').startsWith('video/'))
+    const url = 'https://www.youtube.com/watch?v=' + videoId;
+    const { stdout } = await execFileAsync('yt-dlp', [
+      '--no-playlist', '--no-warnings', '--js-runtimes', 'deno',
+      '--dump-single-json', url
+    ], { maxBuffer: 20 * 1024 * 1024, timeout: 45000 });
+    const info = JSON.parse(stdout);
+    const formats = (info.formats || []).filter(f => f.url && f.protocol && !String(f.protocol).includes('m3u8'));
+    const progressive = formats.filter(f => f.vcodec !== 'none' && f.acodec !== 'none')
       .sort((a,b)=>height(b)-height(a)||bitrate(b)-bitrate(a));
-    const audios = adaptive.filter(f => String(f.mime_type||'').startsWith('audio/'))
+    const videos = formats.filter(f => f.vcodec !== 'none' && f.acodec === 'none' && height(f)>0)
+      .sort((a,b)=>height(b)-height(a)||bitrate(b)-bitrate(a));
+    const audios = formats.filter(f => f.vcodec === 'none' && f.acodec !== 'none')
       .sort((a,b)=>bitrate(b)-bitrate(a));
-    const bestProgressive = progressive[0] || null;
-    const bestVideo = videos[0] || null;
-    const bestAudio = audios[0] || null;
-    if (bestVideo && bestAudio && height(bestVideo) > height(bestProgressive || {})) {
-      return { mode:'remux', videoUrl:bestVideo.url, audioUrl:bestAudio.url, height:height(bestVideo),
-        quality:bestVideo.quality_label || `${height(bestVideo)}p` };
-    }
-    if (bestProgressive) return { mode:'direct', url:bestProgressive.url, height:height(bestProgressive),
-      quality:bestProgressive.quality_label || `${height(bestProgressive)}p` };
+    const p=progressive[0]||null, v=videos[0]||null, a=audios[0]||null;
+    if (v && a && height(v) > height(p||{})) return {mode:'remux',videoUrl:v.url,audioUrl:a.url,height:height(v),quality:(v.format_note||height(v)+'p')};
+    if (p) return {mode:'direct',url:p.url,height:height(p),quality:(p.format_note||height(p)+'p')};
+    if (v && a) return {mode:'remux',videoUrl:v.url,audioUrl:a.url,height:height(v),quality:(v.format_note||height(v)+'p')};
     return null;
-  } catch (e) {
-    console.warn('[MaxQuality] YouTube resolution failed:', e?.message || e);
+  } catch(e) {
+    console.warn('[MaxQuality] yt-dlp resolution failed:', e?.stderr || e?.message || e);
     return null;
   }
 }
-module.exports = { resolveBestYouTubeSources };
+module.exports={resolveBestYouTubeSources};
