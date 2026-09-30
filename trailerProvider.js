@@ -514,7 +514,7 @@ async function buildMaxQualityStream(ytId, title, useExternalLink) {
             return {
                 name: title + ' · MAX ' + bestVideo.height + 'p',
                 title,
-                url: '/max-quality/' + encodeURIComponent(ytId),
+                url: (process.env.PUBLIC_BASE_URL || 'https://streailer-simple-max-production.up.railway.app').replace(/\/$/, '') + '/max-quality/' + encodeURIComponent(ytId),
                 behaviorHints: { notWebReady: true, bingeGroup: 'trailer' }
             };
         }
