@@ -1,7 +1,7 @@
 {
   "name": "streailer",
-  "version": "1.5.0",
-  "description": "Stremio Trailer Addon with multi-language support",
+  "version": "1.6.0",
+  "description": "Stremio Trailer Addon with multi-language support and maximum available YouTube quality",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -19,7 +19,8 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "node-fetch": "^2.7.0",
-    "stremio-addon-sdk": "^1.6.10"
+    "stremio-addon-sdk": "^1.6.10",
+    "youtubei.js": "^16.0.1"
   },
   "engines": {
     "node": ">=14"
