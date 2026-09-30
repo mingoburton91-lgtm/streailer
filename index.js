@@ -309,6 +309,44 @@ app.use((req, res, next) => {
     next();
 });
 
+// Direct external-link stream route: bypass SDK config parsing completely.
+app.get('/:config/stream/:type/:id.json', async (req, res, next) => {
+    const params = new URLSearchParams(decodeURIComponent(req.params.config || ''));
+    const external = params.get('external') === 'true' || params.get('externalLink') === 'true';
+    if (!external) return next();
+
+    try {
+        const type = req.params.type;
+        const id = req.params.id;
+        let imdbId = null;
+        let tmdbId = null;
+        let season;
+        if (id.startsWith('tt')) {
+            const parts = id.split(':');
+            imdbId = parts[0];
+            if (parts[1]) season = parseInt(parts[1], 10);
+        } else if (id.startsWith('tmdb:')) {
+            const parts = id.split(':');
+            tmdbId = parseInt(parts[1], 10);
+            if (parts[2]) season = parseInt(parts[2], 10);
+        }
+        const language = params.get('lang') || params.get('language') || 'it-IT';
+        const streams = await getTrailerStreams(type === 'series' ? 'series' : 'movie', imdbId, undefined, season, tmdbId, language, true);
+        const externalStreams = (streams || []).filter(s => s.externalUrl).map(s => ({
+            name: s.name || 'Trailer YouTube',
+            title: s.title || s.name || 'Trailer YouTube',
+            externalUrl: s.externalUrl
+        }));
+        console.log(`[Streailer] DIRECT external response: ${JSON.stringify(externalStreams)}`);
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.json({ streams: externalStreams });
+    } catch (err) {
+        console.error('[Streailer] Direct external route error:', err);
+        return res.json({ streams: [] });
+    }
+});
+
 // Use the addon router for other routes (streams, etc.)
 app.use('/', addonRouter);
 
