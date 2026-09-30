@@ -97,11 +97,6 @@ builder.defineStreamHandler(async ({ type, id, config }) => {
     try {
         console.log(`[Streailer] Stream request: type=${type}, id=${id}, config=${JSON.stringify(config)}`);
 
-        if (!isTrailerProviderAvailable()) {
-            console.warn('[Streailer] TMDB API key not configured');
-            return { streams: [] };
-        }
-
         // Get config options
         const language = config?.language || 'it-IT';
         const useExternalLink = config?.externalLink === 'true' || config?.externalLink === true || config?.external === 'true' || config?.external === true;
