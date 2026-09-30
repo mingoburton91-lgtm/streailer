@@ -5,6 +5,7 @@
  */
 
 const fetch = require('node-fetch');
+const { resolveBestProgressiveStream } = require('./youtubeMaxQuality');
 
 // TMDB API configuration
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -641,10 +642,27 @@ async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, lang
             }
         };
 
-        // Use externalUrl for external app, or ytId for internal player
+        // External mode keeps the normal YouTube application.
         if (useExternalLink) {
             trailerStream.externalUrl = `https://www.youtube.com/watch?v=${trailerResult.ytId}`;
+            return [trailerStream];
+        }
+
+        // Max-quality mode: first try a directly playable YouTube format.
+        // IMPORTANT: YouTube commonly exposes >720p as separate video/audio tracks.
+        // We only return a direct URL when it contains both tracks; otherwise the
+        // original ytId is preserved so trailer playback never regresses.
+        const direct = await resolveBestProgressiveStream(trailerResult.ytId);
+        if (direct?.url) {
+            console.log(`[TrailerProvider] Max quality direct stream: ${direct.quality}`);
+            trailerStream.url = direct.url;
+            trailerStream.name = `${streamName} · MAX ${direct.quality}`;
+            trailerStream.behaviorHints = {
+                ...trailerStream.behaviorHints,
+                videoSize: undefined
+            };
         } else {
+            console.log('[TrailerProvider] Max-quality direct stream unavailable; falling back to ytId');
             trailerStream.ytId = trailerResult.ytId;
         }
 
