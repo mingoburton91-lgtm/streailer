@@ -1,22 +1,11 @@
-FROM node:18-alpine
-
-# Set working directory
+FROM node:20-alpine
 WORKDIR /app
-
-# Copy package files first for caching
 COPY package*.json ./
-
-# Install dependencies
-# Using npm install instead of ci to ensure it picks up the fixed dotenv version
-# and handles any potential lockfile mismatches gracefully
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg python3 py3-pip deno \
+ && python3 -m venv /opt/ytdlp \
+ && /opt/ytdlp/bin/pip install --no-cache-dir -U "yt-dlp[default]"
+ENV PATH="/opt/ytdlp/bin:$PATH"
 RUN npm install
-
-# Copy source code
 COPY . .
-
-# Expose the default port
 EXPOSE 7020
-
-# Start the addon
 CMD ["node", "index.js"]
