@@ -10,7 +10,7 @@ async function resolveBestYouTubeSources(videoId) {
     const url = 'https://www.youtube.com/watch?v=' + videoId;
     const { stdout } = await execFileAsync('yt-dlp', [
       '--no-playlist', '--no-warnings', '--js-runtimes', 'deno',
-      '--extractor-args', 'youtube:player_client=tv,web_safari,android_vr',
+      '--extractor-args', 'youtube:player_client=tv,android_sdkless,web,web_safari',
       '--dump-single-json', url
     ], { maxBuffer: 20 * 1024 * 1024, timeout: 45000 });
     const info = JSON.parse(stdout);
