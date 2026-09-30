@@ -1,0 +1,19 @@
+name: Max Quality CI
+on:
+  push:
+    branches: [streailer-max-quality]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: npm install
+      - run: node --check index.js
+      - run: node --check trailerProvider.js
+      - run: node --check youtubeMaxQuality.js
+      - run: node --check maxQualityRoute.js
+      - run: docker build -t streailer-max-quality .
