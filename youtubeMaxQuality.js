@@ -1,42 +1,40 @@
 /**
- * Resolve a YouTube video to the highest quality stream that still contains
- * both video and audio. Progressive formats are preferred because Stremio
- * expects one directly playable URL; adaptive 1080p/1440p/2160p YouTube
- * formats normally split audio and video and therefore require muxing/proxying.
+ * Resolve the best YouTube playback sources.
+ * Prefer a single progressive A/V stream when it already reaches the maximum
+ * resolution. Otherwise expose the best separate video + audio tracks so the
+ * addon can remux them without re-encoding.
  */
 let innertubePromise;
-
 async function getInnertube() {
-  if (!innertubePromise) {
-    innertubePromise = import('youtubei.js').then(({ Innertube }) => Innertube.create());
-  }
+  if (!innertubePromise) innertubePromise = import('youtubei.js').then(({ Innertube }) => Innertube.create());
   return innertubePromise;
 }
-
-function formatHeight(format) {
-  return Number(format.height || (format.quality_label || '').match(/(\d+)p/)?.[1] || 0);
-}
-
-async function resolveBestProgressiveStream(videoId) {
+function height(f) { return Number(f.height || (f.quality_label || '').match(/(\d+)p/)?.[1] || 0); }
+function bitrate(f) { return Number(f.bitrate || f.average_bitrate || 0); }
+async function resolveBestYouTubeSources(videoId) {
   try {
-    const youtube = await getInnertube();
-    const info = await youtube.getBasicInfo(videoId);
-    const formats = (info.streaming_data?.formats || [])
-      .filter(f => f.url && f.has_audio !== false && f.has_video !== false)
-      .sort((a, b) => formatHeight(b) - formatHeight(a) || Number(b.bitrate || 0) - Number(a.bitrate || 0));
-
-    if (!formats.length) return null;
-    const best = formats[0];
-    return {
-      url: best.url,
-      height: formatHeight(best),
-      quality: best.quality_label || (formatHeight(best) ? `${formatHeight(best)}p` : 'Max'),
-      mimeType: best.mime_type || ''
-    };
-  } catch (error) {
-    console.warn('[MaxQuality] Direct YouTube resolution failed:', error?.message || error);
+    const yt = await getInnertube();
+    const info = await yt.getBasicInfo(videoId);
+    const sd = info.streaming_data || {};
+    const progressive = (sd.formats || []).filter(f => f.url).sort((a,b)=>height(b)-height(a)||bitrate(b)-bitrate(a));
+    const adaptive = (sd.adaptive_formats || []).filter(f => f.url);
+    const videos = adaptive.filter(f => height(f)>0 && String(f.mime_type||'').startsWith('video/'))
+      .sort((a,b)=>height(b)-height(a)||bitrate(b)-bitrate(a));
+    const audios = adaptive.filter(f => String(f.mime_type||'').startsWith('audio/'))
+      .sort((a,b)=>bitrate(b)-bitrate(a));
+    const bestProgressive = progressive[0] || null;
+    const bestVideo = videos[0] || null;
+    const bestAudio = audios[0] || null;
+    if (bestVideo && bestAudio && height(bestVideo) > height(bestProgressive || {})) {
+      return { mode:'remux', videoUrl:bestVideo.url, audioUrl:bestAudio.url, height:height(bestVideo),
+        quality:bestVideo.quality_label || `${height(bestVideo)}p` };
+    }
+    if (bestProgressive) return { mode:'direct', url:bestProgressive.url, height:height(bestProgressive),
+      quality:bestProgressive.quality_label || `${height(bestProgressive)}p` };
+    return null;
+  } catch (e) {
+    console.warn('[MaxQuality] YouTube resolution failed:', e?.message || e);
     return null;
   }
 }
-
-module.exports = { resolveBestProgressiveStream };
+module.exports = { resolveBestYouTubeSources };
