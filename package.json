@@ -19,7 +19,8 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "node-fetch": "^2.7.0",
-    "stremio-addon-sdk": "^1.6.10"
+    "stremio-addon-sdk": "^1.6.10",
+    "@distube/ytdl-core": "^4.16.12"
   },
   "engines": {
     "node": ">=14"
