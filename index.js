@@ -255,6 +255,21 @@ builder.defineStreamHandler(async ({ type, id, config }) => {
 // Create Express app
 const app = express();
 
+// Preserve configuration encoded in the Stremio URL path for stream requests.
+// The addon SDK does not pass the custom "external" parameter through as config.
+app.use((req, res, next) => {
+    const match = req.path.match(/^\/([^/]+)\/stream\/(movie|series)\//);
+    if (match) {
+        const rawConfig = decodeURIComponent(match[1]);
+        const params = new URLSearchParams(rawConfig);
+        if (params.get('external') === 'true' || params.get('externalLink') === 'true') {
+            req.url = req.url.replace(/^\/[^/]+\//, '/externalLink=true/');
+            console.log('[Streailer] External Link forced from request path');
+        }
+    }
+    next();
+});
+
 // Redirect root to configure
 app.get('/', (req, res) => {
     res.redirect('/configure');
