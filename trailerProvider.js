@@ -5,6 +5,7 @@
  */
 
 const fetch = require('node-fetch');
+const ytdl = require('@distube/ytdl-core');
 
 // TMDB API configuration
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -491,6 +492,41 @@ async function searchYouTubeTrailer(contentName, type, season, language = 'en-US
  * Flow: TMDB (user language) → YouTube scraping (localized) → TMDB en-US
  * Note: Recaps are now handled by recapProvider.js
  */
+async function buildMaxQualityStream(ytId, title, useExternalLink) {
+    if (useExternalLink) return { name: title + ' · MAX', title, externalUrl: 'https://www.youtube.com/watch?v=' + ytId };
+    try {
+        const info = await ytdl.getInfo(ytId);
+        const videoFormats = ytdl.filterFormats(info.formats, 'videoonly')
+            .filter(f => f.url && f.height)
+            .sort((a,b) => (b.height||0)-(a.height||0) || (b.bitrate||0)-(a.bitrate||0));
+        const audioFormats = ytdl.filterFormats(info.formats, 'audioonly')
+            .filter(f => f.url)
+            .sort((a,b) => (b.audioBitrate||0)-(a.audioBitrate||0));
+        const progressive = ytdl.filterFormats(info.formats, 'audioandvideo')
+            .filter(f => f.url && f.height)
+            .sort((a,b) => (b.height||0)-(a.height||0));
+
+        const bestVideo = videoFormats[0];
+        const bestAudio = audioFormats[0];
+        const bestProgressive = progressive[0];
+
+        if (bestVideo && bestAudio && bestVideo.height > (bestProgressive?.height || 0)) {
+            return {
+                name: title + ' · MAX ' + bestVideo.height + 'p',
+                title,
+                url: '/max-quality/' + encodeURIComponent(ytId),
+                behaviorHints: { notWebReady: true, bingeGroup: 'trailer' }
+            };
+        }
+        if (bestProgressive) {
+            return { name: title + ' · MAX ' + bestProgressive.height + 'p', title, url: bestProgressive.url };
+        }
+    } catch (e) {
+        console.error('[TrailerProvider] Max quality resolver failed:', e.message);
+    }
+    return { name: title + ' · MAX fallback', title, ytId };
+}
+
 async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, language = 'it-IT', useExternalLink = false) {
     // Personal Simple MAX mode: when TMDB is unavailable, search YouTube directly.
     // Stremio gives us an IMDb id; using it in the query avoids needing a metadata API.
@@ -509,10 +545,7 @@ async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, lang
         if (!result?.ytId) return [];
 
         const streamName = result.title || 'Trailer YouTube';
-        const stream = { name: `${streamName} · MAX`, title: streamName };
-        if (useExternalLink) stream.externalUrl = `https://www.youtube.com/watch?v=${result.ytId}`;
-        else stream.ytId = result.ytId;
-        return [stream];
+        return [await buildMaxQualityStream(result.ytId, streamName, useExternalLink)];
     }
 
     const t = getTranslation(language);
@@ -650,24 +683,7 @@ async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, lang
 
         console.log(`[TrailerProvider] Final: ${streamName} | ${trailerResult.title} (${trailerResult.source})${useExternalLink ? ' [External]' : ''}`);
 
-        const trailerStream = {
-            name: streamName,
-            title: trailerResult.title,
-            behaviorHints: {
-                notWebReady: true,
-                bingeGroup: 'trailer'
-            }
-        };
-
-        // Keep the original Streailer playback path. Stremio receives the exact
-        // YouTube video ID and chooses the best quality supported by its player.
-        // No proxy/remux and no replacement of the selected trailer.
-        if (useExternalLink) {
-            trailerStream.externalUrl = `https://www.youtube.com/watch?v=${trailerResult.ytId}`;
-        } else {
-            trailerStream.ytId = trailerResult.ytId;
-            trailerStream.name = `${streamName} · MAX`;
-        }
+        const trailerStream = await buildMaxQualityStream(trailerResult.ytId, trailerResult.title, useExternalLink);
 
         return [trailerStream];
 
