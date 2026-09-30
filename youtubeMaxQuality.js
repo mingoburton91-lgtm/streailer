@@ -6,7 +6,7 @@
  */
 let innertubePromise;
 async function getInnertube() {
-  if (!innertubePromise) innertubePromise = import('youtubei.js').then(({ Innertube }) => Innertube.create());
+  if (!innertubePromise) innertubePromise = import('youtubei.js').then(({ Innertube }) => Innertube.create({ player_id: process.env.YOUTUBE_PLAYER_ID || '0004de42' }));
   return innertubePromise;
 }
 function height(f) { return Number(f.height || (f.quality_label || '').match(/(\d+)p/)?.[1] || 0); }
