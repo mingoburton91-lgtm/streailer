@@ -641,11 +641,14 @@ async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, lang
             }
         };
 
-        // Use externalUrl for external app, or ytId for internal player
+        // Keep the original Streailer playback path. Stremio receives the exact
+        // YouTube video ID and chooses the best quality supported by its player.
+        // No proxy/remux and no replacement of the selected trailer.
         if (useExternalLink) {
             trailerStream.externalUrl = `https://www.youtube.com/watch?v=${trailerResult.ytId}`;
         } else {
             trailerStream.ytId = trailerResult.ytId;
+            trailerStream.name = `${streamName} · MAX`;
         }
 
         return [trailerStream];
