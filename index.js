@@ -104,7 +104,7 @@ builder.defineStreamHandler(async ({ type, id, config }) => {
 
         // Get config options
         const language = config?.language || 'it-IT';
-        const useExternalLink = config?.externalLink === 'true' || config?.externalLink === true;
+        const useExternalLink = config?.externalLink === 'true' || config?.externalLink === true || config?.external === 'true' || config?.external === true;
         const showRecap = config?.showRecap === 'true' || config?.showRecap === true;
         const onlyRecaps = config?.onlyRecaps === 'true' || config?.onlyRecaps === true;
 
