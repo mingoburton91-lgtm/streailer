@@ -5,6 +5,7 @@ require('dotenv').config();
 const { addonBuilder, getRouter } = require('stremio-addon-sdk');
 const express = require('express');
 const path = require('path');
+const { registerMaxQualityRoute } = require('./maxQualityRoute');
 const { getTrailerStreams, isTrailerProviderAvailable, imdbToTmdbWithLanguage } = require('./trailerProvider');
 const { getRecapStreams } = require('./recapProvider');
 const { kitsuToTmdb } = require('./kitsuProvider');
@@ -254,6 +255,7 @@ builder.defineStreamHandler(async ({ type, id, config }) => {
 
 // Create Express app
 const app = express();
+registerMaxQualityRoute(app);
 
 // Redirect root to configure
 app.get('/', (req, res) => {
