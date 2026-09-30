@@ -5,7 +5,7 @@
  */
 
 const fetch = require('node-fetch');
-const ytdl = require('@distube/ytdl-core');
+const { resolveBestYouTubeSources } = require('./youtubeMaxQuality');
 
 // TMDB API configuration
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -495,31 +495,13 @@ async function searchYouTubeTrailer(contentName, type, season, language = 'en-US
 async function buildMaxQualityStream(ytId, title, useExternalLink) {
     if (useExternalLink) return { name: title + ' · MAX', title, externalUrl: 'https://www.youtube.com/watch?v=' + ytId };
     try {
-        const info = await ytdl.getInfo(ytId);
-        const videoFormats = ytdl.filterFormats(info.formats, 'videoonly')
-            .filter(f => f.url && f.height)
-            .sort((a,b) => (b.height||0)-(a.height||0) || (b.bitrate||0)-(a.bitrate||0));
-        const audioFormats = ytdl.filterFormats(info.formats, 'audioonly')
-            .filter(f => f.url)
-            .sort((a,b) => (b.audioBitrate||0)-(a.audioBitrate||0));
-        const progressive = ytdl.filterFormats(info.formats, 'audioandvideo')
-            .filter(f => f.url && f.height)
-            .sort((a,b) => (b.height||0)-(a.height||0));
-
-        const bestVideo = videoFormats[0];
-        const bestAudio = audioFormats[0];
-        const bestProgressive = progressive[0];
-
-        if (bestVideo && bestAudio && bestVideo.height > (bestProgressive?.height || 0)) {
-            return {
-                name: title + ' · MAX ' + bestVideo.height + 'p',
-                title,
-                url: (process.env.PUBLIC_BASE_URL || 'https://streailer-simple-max-production.up.railway.app').replace(/\/$/, '') + '/max-quality/' + encodeURIComponent(ytId),
-                behaviorHints: { notWebReady: true, bingeGroup: 'trailer' }
-            };
+        const resolved = await resolveBestYouTubeSources(ytId);
+        if (resolved?.mode === 'remux') {
+            const base = (process.env.PUBLIC_BASE_URL || 'https://streailer-simple-max-production.up.railway.app').replace(/\/$/, '');
+            return { name: title + ' · MAX ' + resolved.quality, title, url: base + '/max-quality/' + encodeURIComponent(ytId), behaviorHints: { notWebReady: true, bingeGroup: 'trailer' } };
         }
-        if (bestProgressive) {
-            return { name: title + ' · MAX ' + bestProgressive.height + 'p', title, url: bestProgressive.url };
+        if (resolved?.mode === 'direct' && resolved.url) {
+            return { name: title + ' · MAX ' + resolved.quality, title, url: resolved.url };
         }
     } catch (e) {
         console.error('[TrailerProvider] Max quality resolver failed:', e.message);
