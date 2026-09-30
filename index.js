@@ -8,6 +8,7 @@ const path = require('path');
 const { getTrailerStreams, isTrailerProviderAvailable, imdbToTmdbWithLanguage } = require('./trailerProvider');
 const { getRecapStreams } = require('./recapProvider');
 const { kitsuToTmdb } = require('./kitsuProvider');
+const { registerMaxQualityRoute } = require('./maxQualityRoute');
 
 const MAX_SEASON = 50;
 const MAX_CONCURRENT_STREAMS = Number(process.env.MAX_CONCURRENT_STREAMS) || 20;
@@ -298,6 +299,9 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// Max-quality remux route must be registered before the SDK router.
+registerMaxQualityRoute(app);
 
 // Use the addon router for other routes (streams, etc.)
 app.use('/', addonRouter);
