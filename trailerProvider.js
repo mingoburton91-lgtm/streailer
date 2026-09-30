@@ -5,7 +5,7 @@
  */
 
 const fetch = require('node-fetch');
-const { resolveBestProgressiveStream } = require('./youtubeMaxQuality');
+const { resolveBestYouTubeSources } = require('./youtubeMaxQuality');
 
 // TMDB API configuration
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -652,17 +652,17 @@ async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, lang
         // IMPORTANT: YouTube commonly exposes >720p as separate video/audio tracks.
         // We only return a direct URL when it contains both tracks; otherwise the
         // original ytId is preserved so trailer playback never regresses.
-        const direct = await resolveBestProgressiveStream(trailerResult.ytId);
-        if (direct?.url) {
-            console.log(`[TrailerProvider] Max quality direct stream: ${direct.quality}`);
-            trailerStream.url = direct.url;
-            trailerStream.name = `${streamName} · MAX ${direct.quality}`;
-            trailerStream.behaviorHints = {
-                ...trailerStream.behaviorHints,
-                videoSize: undefined
-            };
+        const resolved = await resolveBestYouTubeSources(trailerResult.ytId);
+        if (resolved?.mode === 'direct' && resolved.url) {
+            console.log(`[TrailerProvider] Max quality direct stream: ${resolved.quality}`);
+            trailerStream.url = resolved.url;
+            trailerStream.name = `${streamName} · MAX ${resolved.quality}`;
+        } else if (resolved?.mode === 'remux') {
+            console.log(`[TrailerProvider] Max quality remux stream: ${resolved.quality}`);
+            trailerStream.url = `/max-quality/${encodeURIComponent(trailerResult.ytId)}`;
+            trailerStream.name = `${streamName} · MAX ${resolved.quality}`;
         } else {
-            console.log('[TrailerProvider] Max-quality direct stream unavailable; falling back to ytId');
+            console.log('[TrailerProvider] Max-quality stream unavailable; falling back to ytId');
             trailerStream.ytId = trailerResult.ytId;
         }
 
