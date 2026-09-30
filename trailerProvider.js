@@ -8,7 +8,7 @@ const fetch = require('node-fetch');
 
 // TMDB API configuration
 const TMDB_BASE = 'https://api.themoviedb.org/3';
-const TMDB_KEY = process.env.TMDB_KEY;
+function getTmdbKey() { return process.env.TMDB_KEY || ''; }
 const DEFAULT_TIMEOUT_MS = 8000;
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
@@ -298,10 +298,10 @@ function getTranslation(language) {
  * Convert IMDb ID to TMDB ID and get title in specified language
  */
 async function imdbToTmdbWithLanguage(imdbId, type, language) {
-    if (!TMDB_KEY) return null;
+    if (!getTmdbKey()) return null;
 
     try {
-        const url = `${TMDB_BASE}/find/${imdbId}?api_key=${TMDB_KEY}&external_source=imdb_id&language=${language}`;
+        const url = `${TMDB_BASE}/find/${imdbId}?api_key=${getTmdbKey()}&external_source=imdb_id&language=${language}`;
         const response = await fetchWithTimeout(url);
         const data = await response.json();
 
@@ -322,15 +322,15 @@ async function imdbToTmdbWithLanguage(imdbId, type, language) {
  * Fetch videos from TMDB for a movie, TV series, or season
  */
 async function fetchTMDBVideos(tmdbId, type, language, season) {
-    if (!TMDB_KEY) return [];
+    if (!getTmdbKey()) return [];
 
     try {
         let url;
         if (type === 'series' && season !== undefined && season > 0) {
-            url = `${TMDB_BASE}/tv/${tmdbId}/season/${season}/videos?api_key=${TMDB_KEY}&language=${language}`;
+            url = `${TMDB_BASE}/tv/${tmdbId}/season/${season}/videos?api_key=${getTmdbKey()}&language=${language}`;
         } else {
             const mediaType = type === 'series' ? 'tv' : 'movie';
-            url = `${TMDB_BASE}/${mediaType}/${tmdbId}/videos?api_key=${TMDB_KEY}&language=${language}`;
+            url = `${TMDB_BASE}/${mediaType}/${tmdbId}/videos?api_key=${getTmdbKey()}&language=${language}`;
         }
         const response = await fetchWithTimeout(url);
         const data = await response.json();
@@ -492,8 +492,8 @@ async function searchYouTubeTrailer(contentName, type, season, language = 'en-US
  * Note: Recaps are now handled by recapProvider.js
  */
 async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, language = 'it-IT', useExternalLink = false) {
-    if (!TMDB_KEY) {
-        console.warn('[TrailerProvider] TMDB_KEY not set, skipping trailer fetch');
+    if (!getTmdbKey()) {
+        console.warn('[TrailerProvider] getTmdbKey() not set, skipping trailer fetch');
         return [];
     }
 
@@ -512,7 +512,7 @@ async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, lang
             if (!contentTitle) {
                 const mediaType = type === 'series' ? 'tv' : 'movie';
                 try {
-                    const url = `${TMDB_BASE}/${mediaType}/${tmdbId}?api_key=${TMDB_KEY}&language=${language}`;
+                    const url = `${TMDB_BASE}/${mediaType}/${tmdbId}?api_key=${getTmdbKey()}&language=${language}`;
                     const response = await fetchWithTimeout(url);
                     const data = await response.json();
                     contentTitle = data.title || data.name || '';
@@ -663,7 +663,7 @@ async function getTrailerStreams(type, imdbId, contentName, season, tmdbId, lang
  * Check if trailer provider is available
  */
 function isTrailerProviderAvailable() {
-    return !!TMDB_KEY;
+    return !!getTmdbKey();
 }
 
 module.exports = {
